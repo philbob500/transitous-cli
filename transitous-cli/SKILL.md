@@ -1,83 +1,117 @@
 ---
 name: transitous-cli
-description: Route planning via transitous CLI — all modes, stdlib only.
-version: 0.1.0
+description: Plan public transport routes across 80+ countries, no API key.
+version: 0.2.0
 metadata:
   hermes:
     tags:
       - Transitous
-      - CLI
       - Routing
-      - Bus
-      - Train
+      - CLI
+      - PublicTransport
 ---
 
 # Transitous CLI
 
-Stdlib-only CLI for the Transitous MOTIS API. Plan routes, search stops.
-Works from any server (no IP blocks). Install via shared skills repo.
+Plan public transport routes by station name or GPS coordinate. Covers 80+
+countries with all modes — train, bus, tram, flight, ferry. Uses the free
+Transitous MOTIS API (no API key, no IP blocks from datacenter). **Does NOT**
+provide real-time delays or cover budget-airline flights not in GTFS feeds.
+
+Stdlib-only Python script — works anywhere with Python 3.9+.
 
 ## When to Use
 
-- Any route planning request when `transitous-api` skill is loaded
-- "Verbindung von X nach Y"
-- "Route planen"
-- Stop/station search
+- "Verbindung von Großburgwedel nach Hannover"
+- "Wie komme ich von Olbia nach Berlin?"
+- "Route von München nach Neapel planen"
+- "Flugverbindung von X nach Y"
+- Stop/station search by name
 
 ## Prerequisites
 
 No API key. No pip packages. Python 3.9+ stdlib only.
-The script lives in the shared skills repo at `scripts/transitous`.
+The script is installed via shared skills tap at `scripts/transitous`.
+
+## How to Run
+
+Invoke with `terminal` from the tapped repo directory:
+
+```bash
+cd ~/projects/hermes-shared-skills && python3 scripts/transitous route "Hamburg" "Berlin"
+```
+
+Or symlink into PATH once:
+
+```bash
+ln -sf ~/projects/hermes-shared-skills/scripts/transitous ~/.local/bin/transitous
+transitous route "München" "Rom"
+```
 
 ## Quick Reference
 
 ```bash
-# Basic route
-python3 scripts/transitous route "Großburgwedel" "Hannover"
+# Route by station name
+transitous route "Großburgwedel" "Hannover"
 
-# With coordinates
-python3 scripts/transitous route --from 52.509,9.858 --to 52.377,9.741
+# Route by coordinates
+transitous route --from 52.509,9.858 --to 52.377,9.741
 
-# Flight-only routing
-python3 scripts/transitous route "Olbia" "Hannover" --modes AIRPLANE
+# Flight-only mode
+transitous route "Olbia" "Hannover" --modes AIRPLANE
 
 # Specific date
-python3 scripts/transitous route "München" "Berlin" --date 2026-07-04
+transitous route "Berlin" "Paris" --date 2026-07-15
 
 # Stop search
-python3 scripts/transitous stop "Hannover Hbf"
+transitous stop "Hannover Hbf"
 ```
 
-## How to Run
+## Procedure
 
-Invoke via `terminal` tool from the shared skills directory:
+### 1. Route planning
+
+Run `transitous route` with origin and destination. The CLI resolves station
+names via the Transitous geocoding API automatically.
 
 ```bash
-cd ~/projects/hermes-shared-skills && python3 scripts/transitous route "Großburgwedel" "Hannover"
+python3 scripts/transitous route "Großburgwedel" "Hannover"
 ```
 
-Or symlink into PATH:
+For multiple modes, comma-separate:
+
 ```bash
-ln -sf ~/projects/hermes-shared-skills/scripts/transitous ~/.local/bin/transitous
-transitous route "Hamburg" "Berlin"
+python3 scripts/transitous route "Olbia" "Hannover" --modes AIRPLANE,RAIL
 ```
 
-## Options (route)
+### 2. Parse output
+
+Output is human-readable text. Each route shows duration, number of changes,
+and per-leg detail (mode, departure, arrival, stations).
+
+### 3. Key flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--from`, `--to` | positional args | Origin/destination (name or lat,lon) |
+| `--from`, `--to` | positional args | Origin/destination (name or `lat,lon`) |
 | `--date` | now | ISO 8601 datetime |
-| `--modes` | TRANSIT | TRANSIT, RAIL, BUS, AIRPLANE, TRAM, SUBWAY |
-| `--num` | 3 | Number of routes |
-| `--max-transfers` | 5 | Max changes |
-| `--max-time` | 2880 | Max travel time (minutes) |
+| `--modes` | `TRANSIT` | `RAIL,BUS,AIRPLANE,TRAM,SUBWAY` or `TRANSIT` for all |
+| `--num` | 3 | Number of routes to show |
+| `--max-transfers` | 5 | Max changes allowed |
+| `--max-time` | 2880 | Max total travel time in minutes |
 
-## Limitations
+## Pitfalls
 
-- Budget airlines (Eurowings, Ryanair) not in GTFS feeds — direct flights may be missing
-- No real-time delays (uses static GTFS)
-- Stop search uses geocoding — may return multiple IDs for the same station
+- **Budget airlines missing.** Eurowings, Ryanair etc. rarely publish open
+  GTFS feeds. Direct flights like OLB→HAJ (Eurowings EW3845) may not appear
+  even though they exist in reality. Transitous data ≠ real-world availability.
+- **No real-time delays.** Static GTFS only. For DB train delays, add a
+  Timetables `/fchg` lookup per station from `db-timetables-api`.
+- **Stop IDs are MOTIS-specific** (e.g. `de-DELFI_de:03241:31_G`), not DB EVA
+  numbers.
+- **Stop names differ between APIs.** "Hannover Hauptbahnhof" (Transitous) vs.
+  "Hannover Hbf" (Timetables) — manual name mapping needed for delay lookups.
+- **Fair use.** Community-hosted API. Don't poll — ~1 req/s max.
 
 ## Verification
 
@@ -85,4 +119,4 @@ transitous route "Hamburg" "Berlin"
 python3 scripts/transitous route "Großburgwedel" "Hannover" --num 1
 ```
 
-Expected: 1 route with BUS + SUBWAY, ~50-60 min.
+Expected: 1 route with BUS + SUBWAY leg, ~50-60 min travel time.
